@@ -1,0 +1,12 @@
+langchain
+langchain-groq
+langchain-chroma
+langchain-huggingface
+langchain-community
+langgraph
+chromadb
+fastapi
+uvicorn[standard]
+python-dotenv
+biopython
+mcp
