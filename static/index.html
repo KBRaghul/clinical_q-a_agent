@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Clinical Q&amp;A Agent</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f7f5;
+    --panel: #ffffff;
+    --border: #e2e2df;
+    --text: #1f1f1d;
+    --muted: #6b6b66;
+    --accent: #2f6f4f;
+    --accent-fg: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16171a;
+      --panel: #1f2023;
+      --border: #33343a;
+      --text: #eaeaea;
+      --muted: #9a9a9a;
+      --accent: #4caf7d;
+      --accent-fg: #0c130f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  main {
+    width: 100%;
+    max-width: 720px;
+  }
+  h1 {
+    font-size: 1.3rem;
+    margin: 0 0 4px;
+  }
+  p.subtitle {
+    color: var(--muted);
+    margin: 0 0 24px;
+    font-size: 0.9rem;
+  }
+  form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  input[type="text"] {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  button {
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.95rem;
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .status-line {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    min-height: 24px;
+  }
+  .chip {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .chip.active {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .answer {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    white-space: pre-wrap;
+    line-height: 1.5;
+    font-size: 0.95rem;
+    min-height: 60px;
+  }
+  .answer:empty::before {
+    content: "Ask a cardiology question above.";
+    color: var(--muted);
+  }
+  .error {
+    color: #c0392b;
+    font-size: 0.85rem;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Clinical Q&amp;A Agent</h1>
+  <p class="subtitle">RAG over PubMed cardiology abstracts, with relevance grading and live PubMed fallback.</p>
+
+  <form id="ask-form">
+    <input id="question" type="text" placeholder="e.g. What are first-line treatments for atrial fibrillation?" autocomplete="off" />
+    <button id="submit-btn" type="submit">Ask</button>
+  </form>
+
+  <div class="status-line" id="status-line"></div>
+  <div class="answer" id="answer"></div>
+  <div class="error" id="error"></div>
+</main>
+
+<script>
+  const form = document.getElementById("ask-form");
+  const input = document.getElementById("question");
+  const submitBtn = document.getElementById("submit-btn");
+  const statusLine = document.getElementById("status-line");
+  const answerEl = document.getElementById("answer");
+  const errorEl = document.getElementById("error");
+
+  const NODE_LABELS = {
+    retrieve: "Searching local corpus",
+    grade: "Grading relevance",
+    web_search_fallback: "Falling back to live PubMed",
+    generate: "Generating answer",
+  };
+
+  function setStatus(node) {
+    const chip = document.createElement("span");
+    chip.className = "chip active";
+    chip.textContent = NODE_LABELS[node] || node;
+    statusLine.appendChild(chip);
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const question = input.value.trim();
+    if (!question) return;
+
+    submitBtn.disabled = true;
+    statusLine.innerHTML = "";
+    answerEl.textContent = "";
+    errorEl.textContent = "";
+
+    try {
+      const res = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      });
+
+      if (!res.ok || !res.body) {
+        throw new Error(`Request failed (${res.status})`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop(); // keep the last partial line in the buffer
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+          if (event.type === "status") {
+            setStatus(event.node);
+          } else if (event.type === "answer") {
+            answerEl.textContent = event.content;
+          }
+        }
+      }
+    } catch (err) {
+      errorEl.textContent = `Error: ${err.message}`;
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

@@ -4,10 +4,13 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 sys.path.append(str(Path(__file__).resolve().parent.parent / "src"))
 from agent import build_agent  # noqa: E402
+
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 app = FastAPI(title="Clinical Q&A Agent")
 
@@ -47,3 +50,7 @@ async def ask(request: QuestionRequest):
                 yield json.dumps(event) + "\n"
 
     return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+
+
+# Mounted last so it doesn't shadow the /health and /ask routes above.
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
