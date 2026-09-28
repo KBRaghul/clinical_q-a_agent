@@ -2,6 +2,7 @@ langchain
 langchain-groq
 langchain-chroma
 langchain-huggingface
+sentence-transformers
 langchain-community
 langgraph
 chromadb
@@ -9,4 +10,4 @@ fastapi
 uvicorn[standard]
 python-dotenv
 biopython
-mcp
+mcp<2

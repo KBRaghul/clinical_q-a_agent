@@ -8,7 +8,7 @@ from langchain_groq import ChatGroq
 
 load_dotenv()
 
-GRADER_MODEL = "llama-3.1-8b-instant"
+GRADER_MODEL = "openai/gpt-oss-20b"
 
 
 class GradeDocument(BaseModel):

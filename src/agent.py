@@ -13,7 +13,7 @@ from mcp_client import search_pubmed_live
 
 load_dotenv()
 
-GENERATION_MODEL = "llama-3.1-8b-instant"
+GENERATION_MODEL = "openai/gpt-oss-20b"
 MIN_RELEVANT_CHUNKS = 2  # below this, fall back to live PubMed search via MCP
 
 llm = ChatGroq(model=GENERATION_MODEL, api_key=os.getenv("GROQ_API_KEY"), temperature=0.2)

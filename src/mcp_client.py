@@ -23,5 +23,6 @@ async def search_pubmed_live(query: str, max_results: int = 5) -> list[dict]:
                 "search_pubmed", {"query": query, "max_results": max_results}
             )
 
-    text = result.content[0].text if result.content else "[]"
-    return json.loads(text)
+    # FastMCP serializes a list[dict] return value as one TextContent block
+    # per item, each holding that item's JSON - not a single JSON array.
+    return [json.loads(block.text) for block in result.content]
